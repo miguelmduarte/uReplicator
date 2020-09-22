@@ -58,6 +58,7 @@ public class ZookeeperCheckpointManager implements ICheckPointManager {
         config.getProperty(Constants.COMMIT_ZOOKEEPER_SERVER_CONFIG),
         config.getInt(ConsumerConfig.SESSION_TIMEOUT_MS_CONFIG, 10000),
         config.getInt(ConsumerConfig.REQUEST_TIMEOUT_MS_CONFIG, 10000));
+    LOGGER.info("ZOOKEEPER FOR COMMITTING OFFSETS: {}", config.getProperty(Constants.COMMIT_ZOOKEEPER_SERVER_CONFIG));
     this.groupId = groupId;
     this.commitExecutor = Executors.newFixedThreadPool(10);
     KafkaUReplicatorMetricsReporter.get().registerMetric(COMMIT_FAILURE_METER_NAME, commitFailure);
@@ -95,6 +96,7 @@ public class ZookeeperCheckpointManager implements ICheckPointManager {
       if (!commitZkClient.exists(path)) {
         commitZkClient.createPersistent(path, true);
       }
+      LOGGER.info("PATH FOR STORING OFFSETS: {}", path);
       commitZkClient.writeData(path,
           String.valueOf(offset));
       offsetCheckpoints.put(topicPartition, offset);
