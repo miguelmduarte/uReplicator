@@ -30,6 +30,9 @@ import java.util.Properties;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
+
+import com.uber.stream.ureplicator.worker.offsetmapper.OffsetMapper;
+import com.uber.stream.ureplicator.worker.offsetmapper.OffsetMapperFactory;
 import org.apache.commons.lang.StringUtils;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.producer.ProducerConfig;
@@ -50,6 +53,7 @@ public class WorkerInstance {
   protected final Properties producerProps;
   protected final CustomizedConsumerConfig consumerProps;
   protected final Properties clusterProps;
+  protected final Properties offsetMapperProps;
   protected final List<BlockingQueue<FetchedDataChunk>> messageQueue = new ArrayList<>();
   protected final List<ConsumerIterator> consumerStream = new ArrayList<>();
   protected final int numOfProducer;
@@ -60,10 +64,16 @@ public class WorkerInstance {
   private IMessageTransformer messageTransformer;
   private ProducerManager producerManager;
   private ICheckPointManager checkpointManager;
+
   // use to observe destination topic partition
   protected TopicPartitionCountObserver observer;
   protected String srcCluster;
   protected String dstCluster;
+
+
+  // Offset Mapper
+  private final OffsetMapperFactory offsetMapperFactory;
+  private final OffsetMapper offsetMapper;
 
   /**
    * Main constructor
@@ -86,6 +96,11 @@ public class WorkerInstance {
         Constants.DEFAULT_NUMBER_OF_PRODUCERS);
     maxQueueSize = consumerProps.getConsumerMaxQueueSize();
     numOfProducer = Math.max(1, Integer.parseInt(numOfProducerStr));
+
+    // Offset Mapper
+    offsetMapperProps = WorkerUtils.loadProperties(workerConf.getOffsetMapperConfigFile());
+    offsetMapperFactory = new OffsetMapperFactory(offsetMapperProps);
+    offsetMapper = offsetMapperFactory.getOffsetMapper();
   }
 
   public boolean isRunning() {
@@ -418,7 +433,10 @@ public class WorkerInstance {
    * @param srcOffset source cluster offset
    */
   protected void onProducerCompletionWithoutException(RecordMetadata metadata, int srcPartition,
-      long srcOffset) {
+      long srcOffset, String srcTopic) {
+    LOGGER.info("Message Mapping:\nSRC Partition-Offset: {}-{}\nDST PartitionOffset: {}-{}", srcPartition, srcOffset, metadata.partition(), metadata.offset());
+    offsetMapper.mapOffset(srcTopic, srcPartition, srcOffset, metadata.topic(), metadata.partition(), metadata.offset());
+    //  metadata.topic()
   }
 
   /**
